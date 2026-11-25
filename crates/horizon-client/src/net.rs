@@ -700,7 +700,7 @@ pub fn older_servers_enabled() -> bool {
 
 /// Whether to adapt one server release under the current environment policy. 1.21.4 is the
 /// default-supported legacy protocol; other implemented releases require the explicit opt-in.
-fn older_server_allowed(
+pub(crate) fn older_server_allowed(
     version: horizon_protocol::adapter::ServerVersion,
     setting: Option<&str>,
 ) -> bool {
