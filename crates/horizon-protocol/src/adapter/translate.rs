@@ -191,7 +191,9 @@ pub fn clientbound(
             strip_id(p.encode())
         }
         // 1.21.4 identifies a cooldown by numeric item id; 26.3 identifies the cooldown group by name.
-        (State::Play, cb::COOLDOWN) if session.version == ServerVersion::V1_21_4 => {
+        (State::Play, cb::COOLDOWN)
+            if session.version.at_most(ServerVersion::V1_21_4) =>
+        {
             let mut r = Reader::new(payload);
             let old_item = r.varint()?;
             let duration = r.varint()?;
