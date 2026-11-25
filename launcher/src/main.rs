@@ -3249,61 +3249,12 @@ impl Launcher {
                     }))
                     .into_any_element()
             });
-        let launcher = match &self.self_update {
-            SelfUpdate::Downloading(v, p) => {
-                let done = format!("{:.0}", p * 100.);
-                let said = trf(
-                    "downloading {version}, {percent}%",
-                    &[("version", v), ("percent", &done)],
-                );
-                format!("{}  ·  {said}", backend::VERSION)
-            }
-            SelfUpdate::Ready(v) => trf(
-                "Updated to {version}. Restart the launcher to use it.",
-                &[("version", v)],
-            ),
-            SelfUpdate::Failed(e) => format!(
-                "{}  ·  {}",
-                backend::VERSION,
-                trf("the update failed: {error}", &[("error", e)])
-            ),
-            SelfUpdate::Idle => match &self.updates.launcher {
-                Some(r) => format!(
-                    "{}  ·  {}",
-                    backend::VERSION,
-                    trf(
-                        "{version} available",
-                        &[(
-                            "version",
-                            backend::launcher_version(&r.tag).unwrap_or_default()
-                        )]
-                    )
-                ),
-                None if self.checked.is_some() && self.update_error.is_none() => {
-                    format!("{}  ·  {}", backend::VERSION, tr("up to date"))
-                }
-                None => backend::VERSION.to_string(),
-            },
-        };
-        let launcher_action = match &self.self_update {
-            SelfUpdate::Ready(_) => Some(
-                button("restart-settings", "Restart", Kind::Secondary, &t)
-                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.self_update = SelfUpdate::Failed(backend::restart());
-                        cx.notify();
-                    }))
-                    .into_any_element(),
-            ),
-            SelfUpdate::Downloading(..) => None,
-            _ => Some(
-                button("check", "Check now", Kind::Ghost, &t)
-                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.check_updates();
-                        cx.notify();
-                    }))
-                    .into_any_element(),
-            ),
-        };
+        let launcher = format!(
+            "{}  ·  {}",
+            backend::VERSION,
+            tr("automatic updates disabled")
+        );
+        let launcher_action = None;
         let mono = |s: String| div().font_family(theme::MONO).child(s).into_any_element();
         let plain = |s: &str| div().child(tr(s).to_string()).into_any_element();
         let (accounts, n) = self.account_rows(cx);

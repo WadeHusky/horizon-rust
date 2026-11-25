@@ -3,6 +3,9 @@
 How Horizon's releases are numbered from 0.2 on, how that maps onto the release workflows, and how every install
 made before 0.2 gets there. The workflows themselves are in [release-flow.md](release-flow.md).
 
+In this fork, launcher self-updates are disabled: launcher releases remain available for manual installation,
+while `horizon-launcher update` concerns Horizon game builds only.
+
 Until 0.2 the game was tagged by date (`v2026.10.19.15`) and the launcher counted on its own (`launcher-v0.16.0`).
 From 0.2 both follow [semantic versioning](https://semver.org) and share one release line: **Horizon 0.2.x** is the
 game and the launcher of the 0.2 line.
@@ -75,7 +78,7 @@ Installs made before 0.2 run old code that compares tags number by number, so to
 | --- | --- | --- |
 | Launcher 0.16.0 and older, updating itself | Looks only at `launcher-v` tags and takes one above its own version. Never sees `launcher@`. | **The bridge**: one last `launcher-v0.17.0`, built with the new code. Old launchers take it as usual; it knows it is a `launcher-v` release and takes `launcher@0.2.0` next. Two updates, both by themselves. |
 | Launcher 0.16.0 and older, installing games | Sorts `v0.2.0` below every dated release and below the versions it has installed, so it never offers it. | Once the launcher has updated itself (above), it offers `v0.2.0` like any update. Until then a player can install `v0.2.0` by hand on the Versions page (it is listed last). |
-| Launcher that never updates itself (`HORIZON_LAUNCHER_NO_SELF_UPDATE`, a package) | As above, without the bridge. | Update the package, or install `v0.2.0` by hand. |
+| Launcher with self-updates disabled (a package, or this fork's launcher builds) | As above, without the bridge. | Update the package or install a new launcher build manually; Horizon game updates remain separate. |
 | `horizon-server` from before the bridge | Reads GitHub's *latest* release and installs it only if its tag compares higher: `v0.2.0` never does. `--version <tag>` skips the comparison. A server never updates itself: its supervisor only logs a notice every 6 hours, and the running process keeps its old code until the service restarts. | **The game bridge**: the last dated release, built with the new code, made stable (*latest*) before `v0.2.0` is published. `v0.2.0` then spends at least 6 hours as a beta, so *latest* stays the bridge for that long (the longer it stays a beta, the more servers are caught). An owner who runs `horizon-server update` in that time gets the bridge, and the command runs the new code at once, so the next `horizon-server update` takes `v0.2.0` once it is stable. The log notice only changes after the service restarts. An owner on old code after that time is told the server is up to date, and runs `horizon-server update --version v0.2.0` once. 0.2.0's notes say so. |
 | Servers the launcher hosts (Servers page) | Set up from the launcher's installed versions. | Follow the launcher. |
 | `install.sh`, `install.ps1` | Install *latest*. | Nothing to do. |

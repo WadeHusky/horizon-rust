@@ -847,7 +847,7 @@ enum Cmd {
         #[arg(long)]
         crash: bool,
     },
-    /// Look for a newer Horizon release and launcher, and install them
+    /// Look for a newer Horizon game release and install it; launcher updates are manual
     Update {
         /// Only report what is available
         #[arg(long)]
@@ -1734,7 +1734,10 @@ fn update(check: bool, as_json: bool) -> Result<(), String> {
         }
     }
     match &updates.launcher {
-        None => println!("Launcher: {} is up to date.", backend::VERSION),
+        None => println!(
+            "Launcher: self-updates are disabled (running {}).",
+            backend::VERSION
+        ),
         Some(r) => {
             let version = backend::launcher_version(&r.tag).unwrap_or_default();
             if check {

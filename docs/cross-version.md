@@ -3,13 +3,31 @@
 Horizon speaks its own protocol version. For remote servers that advertise a
 different Minecraft protocol, the client can start a local ViaProxy process and
 connect to it over loopback. ViaProxy translates between Horizon's protocol and
-the backend server's protocol.
+the server-facing proxy's protocol.
+
+## Velocity servers
+
+A server may use Velocity as its public entry point. Add the public Velocity
+address to Horizon's server list; Horizon starts ViaProxy locally and routes
+the game connection through it to that Velocity address.
+
+This is a client-side ViaProxy integration, not a ViaVersion plugin installed
+on the Minecraft server or on Velocity. The server does not need a separate
+ViaVersion installation for this route. ViaProxy is the standalone protocol
+translator between Horizon and the Velocity listener. It reads the protocol
+advertised by that listener and uses it as the target version.
+
+The server setup described here uses Velocity for Minecraft 1.7.2 through
+1.21.11. Velocity's general compatibility documentation lists Minecraft 1.7.2
+through 26.3. ViaProxy's own supported client range starts at 1.7.2 and its
+server range covers release versions 1.0 through 26.3. The exact versions
+reachable through a particular Velocity network still depend on that proxy's
+setup and the backend servers behind it.
 
 ## Runtime behavior
 
-- The client status-pings the server before connecting and reads its advertised
-  protocol. Legacy status ping is attempted when the modern status handshake
-  fails.
+- The client status-pings the address and reads its advertised protocol.
+  Legacy status ping is attempted when the modern status handshake fails.
 - A server already speaking Horizon's protocol is contacted directly.
 - A different protocol is routed through a per-server ViaProxy process bound
   only to `127.0.0.1`. The backend version is auto-detected by ViaProxy.

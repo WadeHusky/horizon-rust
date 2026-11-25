@@ -370,6 +370,7 @@ pub(crate) fn parse_releases(
     out
 }
 
+#[cfg(test)]
 fn is_launcher_tag(tag: &str) -> bool {
     launcher_version(tag).is_some()
 }
@@ -400,16 +401,8 @@ pub(crate) fn game_releases(list: &serde_json::Value) -> Vec<Release> {
     out
 }
 
-/// The launcher releases in `list` (the newest 100 releases). Game releases come out several times
-/// a day, so the newest launcher release can be older than all of those: then the newest
-/// `launcher@` and `launcher-v` tags are looked up one by one (a draft's tag is skipped: it has no
-/// public release).
-fn launcher_releases_in(list: &serde_json::Value) -> Vec<Release> {
-    launcher_releases_in_with(list, |url| {
-        get(&url)?.into_json().map_err(|e| e.to_string())
-    })
-}
-
+/// Legacy launcher-release lookup, retained only for unit tests of release parsing.
+#[cfg(test)]
 fn launcher_releases_in_with(
     list: &serde_json::Value,
     json: impl Fn(String) -> Result<serde_json::Value, String>,
@@ -444,6 +437,7 @@ fn launcher_releases_in_with(
 }
 
 /// The launcher tags in GitHub's matching-refs answer, newest first.
+#[cfg(test)]
 fn newest_launcher_tags(refs: &serde_json::Value) -> Vec<String> {
     let mut tags: Vec<String> = refs
         .as_array()
@@ -2546,7 +2540,8 @@ impl Logged {
 
 // ----- Updates -----------------------------------------------------------------------------------
 
-/// What a check found: a Horizon build newer than every installed one, and a newer launcher.
+/// What a check found: a Horizon build newer than every installed one. Launcher self-updates
+/// are disabled; the launcher field is kept empty for serialized/API compatibility.
 #[derive(Clone, Debug, Default, serde::Serialize)]
 pub struct Updates {
     pub horizon: Option<Release>,
@@ -2579,19 +2574,17 @@ fn launcher_update_from(releases: &[Release], own: &str) -> Option<Release> {
         .cloned()
 }
 
-/// Load the game's release list and both update kinds from the same GitHub response.
-/// Publish the game releases before any fallback lookups for older launcher tags, so those
-/// lookups cannot hold up the release pages or opening animation. A list error reaches both.
+/// Load the game's release list and check only for Horizon game updates.
+/// Launcher releases are not queried: this fork installs launcher builds manually.
 pub fn releases_and_updates(
     on_releases: impl FnOnce(Result<Vec<Release>, String>),
 ) -> Result<Updates, String> {
-    releases_and_updates_with(release_list, installed, launcher_releases_in, on_releases)
+    releases_and_updates_with(release_list, installed, on_releases)
 }
 
 fn releases_and_updates_with(
     load: impl FnOnce() -> Result<serde_json::Value, String>,
     installed: impl FnOnce() -> Vec<String>,
-    launchers: impl FnOnce(&serde_json::Value) -> Vec<Release>,
     on_releases: impl FnOnce(Result<Vec<Release>, String>),
 ) -> Result<Updates, String> {
     let list = match load() {
@@ -2606,11 +2599,11 @@ fn releases_and_updates_with(
     on_releases(Ok(releases));
     Ok(Updates {
         horizon,
-        launcher: launcher_update(&launchers(&list)),
+        launcher: None,
     })
 }
 
-/// A fresh release-list request for both kinds of update (plus older-launcher fallback if needed).
+/// A fresh release-list request for Horizon game updates only.
 pub fn check_updates() -> Result<Updates, String> {
     releases_and_updates(|_| {})
 }
@@ -2717,10 +2710,9 @@ fn launcher_asset_running_from(appimage: bool) -> Option<&'static str> {
     }
 }
 
-/// Whether the launcher replaces itself with newer releases of [`REPO`].
-/// `HORIZON_LAUNCHER_NO_SELF_UPDATE=1` keeps updates with a package manager (and out of tests).
+/// Launcher self-updates are disabled in this fork. Install a new launcher build manually.
 pub fn self_update_allowed() -> bool {
-    std::env::var_os("HORIZON_LAUNCHER_NO_SELF_UPDATE").is_none_or(|v| v.is_empty() || v == "0")
+    false
 }
 
 /// The version in `horizon-launcher --version`'s output (`horizon-launcher 0.1.5`).
@@ -3405,6 +3397,11 @@ mod java_tests;
 mod tests {
     use super::*;
     use std::cmp::Ordering::*;
+
+    #[test]
+    fn launcher_self_update_is_disabled() {
+        assert!(!self_update_allowed());
+    }
 
     /// A canonical path loses Windows' verbatim prefix on a drive (horizon-mixins' output
     /// check stats `\\?\C:`, the volume itself, which Windows refuses, os error 1), and keeps

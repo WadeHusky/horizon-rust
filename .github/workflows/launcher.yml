@@ -1,6 +1,6 @@
 # Horizon Offline Launcher: tests on every push and pull request; a tag `launcher@1.2.3` builds the
 # launcher for Windows (with its installer), Linux and macOS, signs the checksums and publishes them
-# as a GitHub release, which launchers already installed update themselves from.
+# as a GitHub release for manual installation.
 name: launcher
 
 on:
@@ -22,8 +22,6 @@ jobs:
   test:
     runs-on: ubuntu-22.04
     timeout-minutes: 60
-    env:
-      HORIZON_LAUNCHER_NO_SELF_UPDATE: "1"
     defaults:
       run:
         working-directory: launcher
