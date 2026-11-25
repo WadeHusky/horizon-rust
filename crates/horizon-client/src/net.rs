@@ -2400,6 +2400,52 @@ mod tests {
             let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
             let port = listener.local_addr().unwrap().port();
             let worker = std::thread::spawn(move || {
+                // Protocol detection now sends a status ping before the login connection.
+                let (status_stream, _) = listener.accept().unwrap();
+                status_stream
+                    .set_read_timeout(Some(Duration::from_secs(10)))
+                    .unwrap();
+                let mut status_server = Connection::from_stream(status_stream).unwrap();
+                let (id, body) = status_server.recv().unwrap();
+                let handshake::Serverbound::Intention(intention) =
+                    handshake::Serverbound::decode(id, &body).unwrap()
+                else {
+                    panic!("expected status handshake")
+                };
+                assert_eq!(intention.intent, handshake::STATUS);
+                let (id, body) = status_server.recv().unwrap();
+                assert!(matches!(
+                    status::Serverbound::decode(id, &body).unwrap(),
+                    status::Serverbound::StatusRequest(_)
+                ));
+                status_server
+                    .send(
+                        &status::Clientbound::StatusResponse(status::StatusResponse {
+                            json: serde_json::json!({
+                                "version": {
+                                    "name": horizon_protocol::GAME_VERSION,
+                                    "protocol": PROTOCOL_VERSION
+                                }
+                            })
+                            .to_string(),
+                        })
+                        .encode(),
+                    )
+                    .unwrap();
+                let (id, body) = status_server.recv().unwrap();
+                let status::Serverbound::PingRequest(ping) =
+                    status::Serverbound::decode(id, &body).unwrap()
+                else {
+                    panic!("expected status ping")
+                };
+                status_server
+                    .send(
+                        &status::Clientbound::PongResponse(status::Ping { time: ping.time })
+                            .encode(),
+                    )
+                    .unwrap();
+                drop(status_server);
+
                 let (stream, _) = listener.accept().unwrap();
                 // Generous: a debug build's key generation on a busy CI runner takes seconds. A pass
                 // never waits for these.
