@@ -1799,7 +1799,13 @@ mod tests {
                 Arc::new(Language::new()),
                 PathBuf::new(),
             );
-            // The client probes the server version before opening the login connection.
+            // The login TCP socket is opened first, but its handshake waits for version detection.
+            let (login_stream, _) = listener.accept().unwrap();
+            login_stream
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+
+            // A second socket carries the status probe used to select a legacy protocol adapter.
             let (stream, _) = listener.accept().unwrap();
             stream
                 .set_read_timeout(Some(Duration::from_secs(5)))
@@ -1846,12 +1852,8 @@ mod tests {
                 .unwrap();
             drop(status_server);
 
-            // Version detection is complete; the client now opens the actual login connection.
-            let (stream, _) = listener.accept().unwrap();
-            stream
-                .set_read_timeout(Some(Duration::from_secs(5)))
-                .unwrap();
-            let mut server = Connection::from_stream(stream).unwrap();
+            // Version detection is complete; the already-open login socket now sends its handshake.
+            let mut server = Connection::from_stream(login_stream).unwrap();
             let (id, body) = server.recv().unwrap();
             let handshake::Serverbound::Intention(packet) =
                 handshake::Serverbound::decode(id, &body).unwrap()
