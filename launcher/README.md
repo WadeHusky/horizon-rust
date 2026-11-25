@@ -225,7 +225,7 @@ page `servers.json` (the list), `servers/<name>/` (the servers created there) an
   what the window does while you play (stays by default; Minimise, or Hide on macOS, puts it away
   when the game starts and brings it back to the front when the game closes; `settings
   while-playing stay|minimize|hide`), the game's extra command-line arguments, an HTTP proxy for
-  downloads, and the launcher's own version and update state.
+  downloads, and the launcher's version. The launcher does not update itself.
 - **Updates**: Horizon ships only the Nightly (since 2026-10-28, docs/release-flow.md). The
   launcher installs the current one (the `nightly` pre-release, checksums signed for the Nightly
   channel) as `nightly-<date>-<commit>` and selects it when the player was on a Nightly, on the
@@ -243,9 +243,9 @@ page `servers.json` (the list), `servers/<name>/` (the servers created there) an
   one for a single run.
 - **Proxy**: when the internet here needs one (a school's, an office's, a country where a host is
   unreachable), Settings' Proxy takes the `http://host:port` address your proxy app listens on, and
-  every download goes through it: Horizon's releases and the launcher's own update, Minecraft's
-  files and Java from Mojang, Modrinth, CurseForge, Horizon's mod registry, pictures, Microsoft
-  sign-in, and the jars a modpack import fetches. It is kept as `proxy` in `settings.json`, and
+  every download goes through it: Horizon's releases, Minecraft's files and Java from Mojang,
+  Modrinth, CurseForge, Horizon's mod registry, pictures, Microsoft sign-in, and the jars a
+  modpack import fetches. It is kept as `proxy` in `settings.json`, and
   `horizon-launcher settings proxy http://127.0.0.1:7890` sets it too ("default" removes it).
   Without one, `HTTPS_PROXY` and `HTTP_PROXY` are used when the launcher is started with them, and
   `NO_PROXY` names the hosts to reach directly, a modpack import's jars included. A server on this
@@ -266,17 +266,17 @@ minimize, maximize/restore and close; macOS and Linux keep their system title ba
 The launcher looks for a newer Nightly when it starts and every 30 minutes while it is open, and
 shows a small "available, Install" line on Play.
 
-The launcher replaces itself with newer `launcher@` releases of this repository
-(`backend::REPO`), never with upstream's, whose account requirement would come back.
+The launcher does not install or apply its own updates. Install a newer launcher release manually;
+the running launcher binary is never replaced. The automatic Horizon game update setting is
+separate and remains available.
 
 On Linux the release also comes as an AppImage, `horizon-launcher-linux-x86_64.AppImage`: one file
 to download, make executable and run, with no installation and no `libfuse2` (its runtime mounts
 the image where FUSE 2 is there and unpacks it where it is not). It is the same binary as the
 `.tar.gz`, with the libraries GPUI needs beside it; glibc, the graphics drivers and the session's
 D-Bus stay the machine's, so it needs glibc 2.35 or newer (Ubuntu 22.04, Debian 12, Fedora 36 and
-newer). A launcher running from one replaces the AppImage itself when it updates
-(`$APPIMAGE`), and the menu entry it writes starts the AppImage rather than the copy inside the
-image, which is gone when the launcher exits.
+newer). Since the launcher does not self-update, replace the AppImage manually when installing a
+new launcher release.
 
 On Linux a release build that starts writes its applications-menu entry only when there is
 none, or when the program the entry starts (its `TryExec`, else its `Exec`) no longer exists.
@@ -285,12 +285,11 @@ never takes it over. Turning the Settings switch on, or `horizon-launcher deskto
 points the entry at this launcher whatever is there.
 
 Linux packagers can set `HORIZON_LAUNCHER_DESKTOP_EXEC` to a wrapper's absolute path.
-Menu entries the launcher writes then start that wrapper, which can
-set `HORIZON_LAUNCHER_NO_SELF_UPDATE=1` to keep launcher updates with the package manager.
+Menu entries the launcher writes then start that wrapper.
 
 Launcher releases are tags: `launcher@X.Y.Z` runs the `launcher` workflow, which builds Linux, macOS
 and Windows and publishes `horizon-launcher-linux-x86_64.tar.gz`, `horizon-launcher-macos-arm64.zip`,
-`horizon-launcher-windows-x64.zip` (what launchers update themselves from) and the Windows installer
+`horizon-launcher-windows-x64.zip` for manual installation and the Windows installer
 `Horizon-Offline-Launcher-Setup.exe` (`packaging/windows/setup.iss`), signed and marked latest. The version is built in from the tag
 (`HORIZON_LAUNCHER_VERSION`); `Cargo.toml`'s version is only what local builds report.
 
@@ -325,7 +324,7 @@ and don't set `%ERRORLEVEL%` / `$LASTEXITCODE`. Scripts that need the exit code 
     horizon-launcher notes [<tag>]                  patch notes as plain text
     horizon-launcher links                          the Discord, sponsor and website links
     horizon-launcher game-args [<line>]             show or set the extra arguments the game starts with
-    horizon-launcher update [--check]               Horizon and the launcher
+    horizon-launcher update [--check]               Horizon game build only
     horizon-launcher logs [--lines N] [--crash]     the end of the game's log, or its newest crash report
     horizon-launcher account [list]                 the Microsoft accounts signed in (* = plays)
     horizon-launcher account sign-in                sign in in your browser with a code
