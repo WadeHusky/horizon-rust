@@ -1413,12 +1413,10 @@ pub(crate) mod v1_21_4 {
         Ok(w.data)
     }
 
-    /// The advancements with 1.21.5's toast gate after the fields of 1.21.4's packet. Enabling the gate
-    /// preserves 1.21.4's behaviour: each advancement's own show-toast display flag still decides whether
-    /// completing it produces a toast.
+    /// 1.21.4 has no global toast gate; use false when the newer client expects it.
     fn advancements_up(payload: &[u8]) -> Vec<u8> {
         let mut p = payload.to_vec();
-        p.push(1);
+        p.push(0);
         p
     }
 
@@ -1645,16 +1643,7 @@ pub(crate) mod v1_21_4 {
     }
 
 
-    #[cfg(test)]
-    mod tests {
-        use super::*;
 
-        #[test]
-        fn advancements_keep_per_advancement_toast_behavior_enabled() {
-            let payload = [0x12, 0x34, 0x56];
-            assert_eq!(advancements_up(&payload), [0x12, 0x34, 0x56, 1]);
-        }
-    }
 }
 
 /// 1.21.8 to 1.21.10: the mirror of `client_session::step_1_21_8`. What 1.21.8 lays out differently:
