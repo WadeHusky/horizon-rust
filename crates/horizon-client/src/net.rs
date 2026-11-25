@@ -720,10 +720,42 @@ fn older_server(address: &str) -> Option<horizon_protocol::adapter::ServerVersio
     if setting.as_deref() == Some("0") {
         return None;
     }
-    let (json, _) = ping(address, Duration::from_secs(5)).ok()?;
-    let protocol = i32::try_from(json["version"]["protocol"].as_i64()?).ok()?;
-    ServerVersion::from_protocol(protocol)
-        .filter(|v| *v != ServerVersion::Current && older_server_allowed(*v, setting.as_deref()))
+    let (json, _) = match ping(address, Duration::from_secs(5)) {
+        Ok(result) => result,
+        Err(error) => {
+            log::warn!("Could not detect server protocol for {address}: status ping failed: {error}");
+            return None;
+        }
+    };
+    let Some(raw_protocol) = json["version"]["protocol"].as_i64() else {
+        log::warn!("Could not detect server protocol for {address}: status response has no protocol");
+        return None;
+    };
+    let Ok(protocol) = i32::try_from(raw_protocol) else {
+        log::warn!(
+            "Could not detect server protocol for {address}: invalid protocol {raw_protocol}"
+        );
+        return None;
+    };
+    match ServerVersion::from_protocol(protocol) {
+        Some(ServerVersion::Current) => None,
+        Some(version) => {
+            if older_server_allowed(version, setting.as_deref()) {
+                Some(version)
+            } else {
+                log::warn!(
+                    "Server {address} uses {}, but its adapter is disabled by HORIZON_OLDER_SERVERS={:?}",
+                    version.name(),
+                    setting.as_deref()
+                );
+                None
+            }
+        }
+        None => {
+            log::warn!("Server {address} reports unsupported protocol {protocol}");
+            None
+        }
+    }
 }
 
 /// `Connection.exceptionCaught`: a read that timed out ends with
@@ -787,12 +819,16 @@ fn run(
                 target
             }
         };
+        // Detect the server protocol before opening the login socket. Some proxies
+        // limit concurrent unauthenticated connections, and the status probe itself
+        // opens a second TCP connection.
+        let version = (!address.starts_with(FRIEND))
+            .then(|| older_server(address))
+            .flatten();
         let (mut c, host, port) =
             connect_tcp(&host, port, address.starts_with(FRIEND), READ_TIMEOUT)
                 .map_err(Reason::plain)?;
-        if !address.starts_with(FRIEND)
-            && let Some(version) = older_server(address)
-        {
+        if let Some(version) = version {
             log::info!("Joining {address} as a {} server", version.name());
             // Before 1.21.3, cooldown packets carry numeric item ids; 26.3 expects a group identifier.
             // Resolve pinned item names only for those older server protocols.
@@ -1799,13 +1835,7 @@ mod tests {
                 Arc::new(Language::new()),
                 PathBuf::new(),
             );
-            // The login TCP socket is opened first, but its handshake waits for version detection.
-            let (login_stream, _) = listener.accept().unwrap();
-            login_stream
-                .set_read_timeout(Some(Duration::from_secs(5)))
-                .unwrap();
-
-            // A second socket carries the status probe used to select a legacy protocol adapter.
+            // The status probe runs first, before the login socket is opened.
             let (stream, _) = listener.accept().unwrap();
             stream
                 .set_read_timeout(Some(Duration::from_secs(5)))
@@ -1852,7 +1882,11 @@ mod tests {
                 .unwrap();
             drop(status_server);
 
-            // Version detection is complete; the already-open login socket now sends its handshake.
+            // Version detection is complete; the login socket is opened and sends its handshake.
+            let (login_stream, _) = listener.accept().unwrap();
+            login_stream
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
             let mut server = Connection::from_stream(login_stream).unwrap();
             let (id, body) = server.recv().unwrap();
             let handshake::Serverbound::Intention(packet) =
@@ -2366,6 +2400,52 @@ mod tests {
             let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
             let port = listener.local_addr().unwrap().port();
             let worker = std::thread::spawn(move || {
+                // Protocol detection now sends a status ping before the login connection.
+                let (status_stream, _) = listener.accept().unwrap();
+                status_stream
+                    .set_read_timeout(Some(Duration::from_secs(10)))
+                    .unwrap();
+                let mut status_server = Connection::from_stream(status_stream).unwrap();
+                let (id, body) = status_server.recv().unwrap();
+                let handshake::Serverbound::Intention(intention) =
+                    handshake::Serverbound::decode(id, &body).unwrap()
+                else {
+                    panic!("expected status handshake")
+                };
+                assert_eq!(intention.intent, handshake::STATUS);
+                let (id, body) = status_server.recv().unwrap();
+                assert!(matches!(
+                    status::Serverbound::decode(id, &body).unwrap(),
+                    status::Serverbound::StatusRequest(_)
+                ));
+                status_server
+                    .send(
+                        &status::Clientbound::StatusResponse(status::StatusResponse {
+                            json: serde_json::json!({
+                                "version": {
+                                    "name": horizon_protocol::GAME_VERSION,
+                                    "protocol": PROTOCOL_VERSION
+                                }
+                            })
+                            .to_string(),
+                        })
+                        .encode(),
+                    )
+                    .unwrap();
+                let (id, body) = status_server.recv().unwrap();
+                let status::Serverbound::PingRequest(ping) =
+                    status::Serverbound::decode(id, &body).unwrap()
+                else {
+                    panic!("expected status ping")
+                };
+                status_server
+                    .send(
+                        &status::Clientbound::PongResponse(status::Ping { time: ping.time })
+                            .encode(),
+                    )
+                    .unwrap();
+                drop(status_server);
+
                 let (stream, _) = listener.accept().unwrap();
                 // Generous: a debug build's key generation on a busy CI runner takes seconds. A pass
                 // never waits for these.

@@ -16,11 +16,15 @@ on:
         description: Base release whose game files are repacked with this fork's client (nightly = current offline-launcher Nightly)
         default: nightly
         required: true
-  # Intentionally updating this workflow on main rebuilds and publishes the game Nightly (for example after protocol fixes).
+  # Client/protocol changes rebuild the actual game binary, not only the launcher.
+  # Updating this workflow itself also rebuilds and publishes the game Nightly.
   push:
     branches: [main]
     paths:
       - ".github/workflows/game.yml"
+      - "crates/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
 
 permissions:
   contents: read
