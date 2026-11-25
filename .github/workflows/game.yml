@@ -1,6 +1,5 @@
 # Build the fork's client binary for import into Horizon Offline Launcher.
-# The launcher can import a standalone horizon-client and use the selected installed
-# Horizon version as its base, so this workflow does not depend on upstream release assets.
+# The launcher can use an installed Horizon version as the base for the imported client.
 name: game
 
 on:
@@ -17,19 +16,19 @@ jobs:
   pick:
     runs-on: ubuntu-latest
     outputs:
-      date: \${{ steps.pick.outputs.date }}
-      short: \${{ steps.pick.outputs.short }}
+      date: ${{ steps.pick.outputs.date }}
+      short: ${{ steps.pick.outputs.short }}
     steps:
       - id: pick
         run: |
           set -euo pipefail
           {
             echo "date=$(date -u +%F)"
-            echo "short=\${GITHUB_SHA:0:7}"
+            echo "short=${GITHUB_SHA:0:7}"
           } >> "$GITHUB_OUTPUT"
 
   build:
-    name: build \${{ matrix.name }}
+    name: build ${{ matrix.name }}
     needs: pick
     strategy:
       fail-fast: false
@@ -49,12 +48,12 @@ jobs:
             os: macos-15
             target: x86_64-apple-darwin
             client: horizon-client
-    runs-on: \${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 180
     env:
-      RUSTFLAGS: \${{ matrix.rustflags }}
-      HORIZON_VERSION: nightly-\${{ needs.pick.outputs.date }}
-      HORIZON_NIGHTLY: \${{ needs.pick.outputs.date }} \${{ needs.pick.outputs.short }}
+      RUSTFLAGS: ${{ matrix.rustflags }}
+      HORIZON_VERSION: nightly-${{ needs.pick.outputs.date }}
+      HORIZON_NIGHTLY: ${{ needs.pick.outputs.date }} ${{ needs.pick.outputs.short }}
       HORIZON_TELEMETRY_URL: "off"
     defaults:
       run:
@@ -65,10 +64,10 @@ jobs:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: \${{ matrix.target }}
+          targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: client-\${{ matrix.name }}
+          shared-key: client-${{ matrix.name }}
       - name: ALSA and udev headers
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libasound2-dev libudev-dev
@@ -76,26 +75,26 @@ jobs:
         run: |
           set -euo pipefail
           target=()
-          [[ -n "\${{ matrix.target }}" ]] && target=(--target "\${{ matrix.target }}")
-          cargo build --release --locked -p horizon-client --bin horizon-client "\${target[@]}"
+          [[ -n "${{ matrix.target }}" ]] && target=(--target "${{ matrix.target }}")
+          cargo build --release --locked -p horizon-client --bin horizon-client "${target[@]}"
           out=target/release
-          [[ -n "\${{ matrix.target }}" ]] && out="target/\${{ matrix.target }}/release"
-          echo "CLIENT=$out/\${{ matrix.client }}" >> "$GITHUB_ENV"
+          [[ -n "${{ matrix.target }}" ]] && out="target/${{ matrix.target }}/release"
+          echo "CLIENT=$out/${{ matrix.client }}" >> "$GITHUB_ENV"
       - name: Stage standalone client
         run: |
           set -euo pipefail
           mkdir -p dist
-          cp "$CLIENT" "dist/\${{ matrix.client }}"
-          chmod +x "dist/\${{ matrix.client }}"
+          cp "$CLIENT" "dist/${{ matrix.client }}"
+          chmod +x "dist/${{ matrix.client }}"
           if [[ "$RUNNER_OS" == macOS ]]; then
-            codesign --force --sign - "dist/\${{ matrix.client }}"
+            codesign --force --sign - "dist/${{ matrix.client }}"
           fi
           printf 'Version: nightly-%s-%s\nCommit: %s\nPlatform: %s\n' \
-            "\${{ needs.pick.outputs.date }}" "\${{ needs.pick.outputs.short }}" \
-            "$GITHUB_SHA" "\${{ matrix.name }}" > dist/BUILD.txt
+            "${{ needs.pick.outputs.date }}" "${{ needs.pick.outputs.short }}" \
+            "$GITHUB_SHA" "${{ matrix.name }}" > dist/BUILD.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: horizon-client-\${{ matrix.name }}
+          name: horizon-client-${{ matrix.name }}
           path: dist/*
           if-no-files-found: error
           retention-days: 14
