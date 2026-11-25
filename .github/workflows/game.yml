@@ -35,11 +35,16 @@ jobs:
       upstream_name: ${{ steps.pick.outputs.upstream_name }}
     steps:
       - id: pick
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          name=$(gh api "repos/horizon-rust/horizon/releases/tags/$UPSTREAM" --jq .name)
+          # GITHUB_TOKEN is scoped to this fork, not the public upstream repository.
+          # Use an unauthenticated request for upstream's public release metadata.
+          name=$(curl --fail --silent --show-error \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/horizon-rust/horizon/releases/tags/$UPSTREAM" \
+            | jq -r '.name // empty')
+          [[ -n "$name" ]] || { echo "::error::Could not find upstream release tag: $UPSTREAM"; exit 1; }
           echo "Horizon's $UPSTREAM: $name"
           {
             echo "date=$(date -u +%F)"
