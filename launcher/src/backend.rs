@@ -2717,10 +2717,9 @@ fn launcher_asset_running_from(appimage: bool) -> Option<&'static str> {
     }
 }
 
-/// Whether the launcher replaces itself with newer releases of [`REPO`].
-/// `HORIZON_LAUNCHER_NO_SELF_UPDATE=1` keeps updates with a package manager (and out of tests).
+/// Launcher self-updates are disabled in this fork. Install a new launcher build manually.
 pub fn self_update_allowed() -> bool {
-    std::env::var_os("HORIZON_LAUNCHER_NO_SELF_UPDATE").is_none_or(|v| v.is_empty() || v == "0")
+    false
 }
 
 /// The version in `horizon-launcher --version`'s output (`horizon-launcher 0.1.5`).
