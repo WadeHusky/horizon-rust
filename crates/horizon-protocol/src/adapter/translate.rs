@@ -1317,7 +1317,7 @@ pub(crate) mod v1_21_4 {
 
     /// The clientbound packet `id` a 1.21.4 server sent (`payload` in 1.21.4's layout), in 1.21.5's layout.
     pub fn clientbound(
-        _session: &Session,
+        session: &Session,
         state: State,
         id: i32,
         payload: &[u8],
@@ -1328,7 +1328,7 @@ pub(crate) mod v1_21_4 {
         }
         Ok(Some(match id {
             cb::EXPLODE => explode_up(payload)?,
-            cb::PLAYER_CHAT => player_chat_up(payload)?,
+            cb::PLAYER_CHAT => player_chat_up(session, payload)?,
             cb::SET_PLAYER_TEAM => team_up(payload)?,
             cb::UPDATE_ADVANCEMENTS => advancements_up(payload),
             cb::LEVEL_CHUNK_WITH_LIGHT => chunk_up(payload)?,
@@ -1377,11 +1377,10 @@ pub(crate) mod v1_21_4 {
         Ok(w.data)
     }
 
-    /// A player chat with the global index 1.21.5 starts it with.
-    // TODO(step3): what 1.21.5's global index counts (the messages of the whole server, vanilla's count). 0 until known.
-    fn player_chat_up(payload: &[u8]) -> Result<Vec<u8>> {
+    /// A player chat with the per-connection global index 1.21.5 starts it with.
+    fn player_chat_up(session: &Session, payload: &[u8]) -> Result<Vec<u8>> {
         let mut w = Writer::new();
-        w.varint(0);
+        w.varint(session.next_player_chat_index());
         w.bytes(payload);
         Ok(w.data)
     }
@@ -1414,8 +1413,7 @@ pub(crate) mod v1_21_4 {
         Ok(w.data)
     }
 
-    /// The advancements with 1.21.5's show flag after the removed identifiers, the last field of 1.21.4's.
-    // TODO(step3): what 1.21.5's show flag does (the downloaded pages give only its name); false keeps 1.21.4's behaviour.
+    /// 1.21.4 has no global toast gate; use false when the newer client expects it.
     fn advancements_up(payload: &[u8]) -> Vec<u8> {
         let mut p = payload.to_vec();
         p.push(0);
@@ -1643,6 +1641,9 @@ pub(crate) mod v1_21_4 {
         w.bytes(r.rest());
         Ok(w.data)
     }
+
+
+
 }
 
 /// 1.21.8 to 1.21.10: the mirror of `client_session::step_1_21_8`. What 1.21.8 lays out differently:
