@@ -727,12 +727,14 @@ fn older_server(address: &str) -> Option<horizon_protocol::adapter::ServerVersio
             return None;
         }
     };
-    let Some(protocol) = json["version"]["protocol"].as_i64() else {
+    let Some(raw_protocol) = json["version"]["protocol"].as_i64() else {
         log::warn!("Could not detect server protocol for {address}: status response has no protocol");
         return None;
     };
-    let Ok(protocol) = i32::try_from(protocol) else {
-        log::warn!("Could not detect server protocol for {address}: invalid protocol {protocol}");
+    let Ok(protocol) = i32::try_from(raw_protocol) else {
+        log::warn!(
+            "Could not detect server protocol for {address}: invalid protocol {raw_protocol}"
+        );
         return None;
     };
     match ServerVersion::from_protocol(protocol) {
