@@ -16,7 +16,7 @@ on:
         description: Base release whose game files are repacked with this fork's client (nightly = current offline-launcher Nightly)
         default: nightly
         required: true
-  # Also build/publish when this workflow is deliberately updated on main.
+  # Intentionally updating this workflow on main rebuilds and publishes the game Nightly (for example after protocol fixes).
   push:
     branches: [main]
     paths:
