@@ -14,7 +14,7 @@ use horizon_protocol::{
     connection::{ConnReader, ConnWriter, Connection, Counters},
     crypto::{generate_secret, offline_uuid, server_hash},
     packets::{Empty, configuration as cfg, handshake, login, play},
-    registry::Dynamic,
+    registry::{Builtin, Dynamic},
     rsa::RsaPublicKey,
     servers::parse_address,
     text::{Language, plain, translatable},
@@ -794,7 +794,16 @@ fn run(
             && let Some(version) = older_server(address)
         {
             log::info!("Joining {address} as a {} server", version.name());
-            c.adapt(version);
+            // 1.21.4's cooldown packet names an item by numeric id; 26.3 names its cooldown group.
+            // Resolve the pinned item ids once from the resources prepared by the launcher.
+            let builtin = (version == horizon_protocol::adapter::ServerVersion::V1_21_4)
+                .then(|| {
+                    Builtin::find(resources)
+                        .and_then(|path| Builtin::load(&path).ok())
+                        .map(Arc::new)
+                })
+                .flatten();
+            c.adapt_with_builtin(version, builtin);
         }
         (host, port, c)
     };
