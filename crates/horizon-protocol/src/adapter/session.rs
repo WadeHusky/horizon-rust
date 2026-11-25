@@ -8,7 +8,7 @@
 use std::{
     collections::{HashMap, VecDeque},
     sync::{
-        Mutex,
+        Arc, Mutex,
         atomic::{AtomicU8, Ordering},
     },
 };
@@ -19,6 +19,7 @@ use crate::{
     buf::{Reader, Writer},
     ids,
     packets::handshake,
+    registry::Builtin,
 };
 
 fn to_u8(state: State) -> u8 {
@@ -54,10 +55,16 @@ pub struct Session {
     pub(super) incoming: Mutex<VecDeque<(i32, Vec<u8>)>>,
     /// Packet bodies to send right after the one being sent.
     pub(super) outgoing: Mutex<Vec<Vec<u8>>>,
+    /// The pinned built-in registries, needed to turn an older server's numeric cooldown item into its name.
+    pub(super) builtin: Option<Arc<Builtin>>,
 }
 
 impl Session {
     pub fn new(version: ServerVersion) -> Self {
+        Self::with_builtin(version, None)
+    }
+
+    pub fn with_builtin(version: ServerVersion, builtin: Option<Arc<Builtin>>) -> Self {
         Self {
             version,
             reading: AtomicU8::new(0),
@@ -66,6 +73,7 @@ impl Session {
             kinds: Mutex::new(HashMap::new()),
             incoming: Mutex::new(VecDeque::new()),
             outgoing: Mutex::new(Vec::new()),
+            builtin,
         }
     }
     pub fn reading(&self) -> State {
