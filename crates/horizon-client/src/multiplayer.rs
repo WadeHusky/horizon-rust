@@ -195,6 +195,15 @@ fn ping_all(servers: &[ServerEntry], pings: &Pings, icons: &Icons, file: &Path) 
             .spawn(move || {
                 let result = match crate::net::ping(&address, Duration::from_secs(5)) {
                     Ok((json, ms)) => {
+                        let protocol = json["version"]["protocol"].as_i64().unwrap_or(0);
+                        let json = if crate::net::crossversion::is_compatible(
+                            &address,
+                            i32::try_from(protocol).unwrap_or(0),
+                        ) {
+                            crate::net::crossversion_decisions::badge(json, &address)
+                        } else {
+                            json
+                        };
                         let motd = crate::component::to_text(&json["description"], &mut |s| {
                             Text::literal(s)
                         });
