@@ -195,6 +195,15 @@ fn ping_all(servers: &[ServerEntry], pings: &Pings, icons: &Icons, file: &Path) 
             .spawn(move || {
                 let result = match crate::net::ping(&address, Duration::from_secs(5)) {
                     Ok((json, ms)) => {
+                        let protocol = json["version"]["protocol"].as_i64().unwrap_or(0);
+                        let json = if crate::net::crossversion::is_compatible(
+                            &address,
+                            i32::try_from(protocol).unwrap_or(0),
+                        ) {
+                            crate::net::crossversion_decisions::badge(json, &address)
+                        } else {
+                            json
+                        };
                         let motd = crate::component::to_text(&json["description"], &mut |s| {
                             Text::literal(s)
                         });
@@ -251,6 +260,23 @@ fn ping_all(servers: &[ServerEntry], pings: &Pings, icons: &Icons, file: &Path) 
                     // ClientStatusPacketListener.onDisconnect without a
                     // status: pingLegacyServer.
                     Err(e) => match crate::net::ping_legacy(&address, Duration::from_secs(5)) {
+                        Ok(legacy)
+                            if crate::net::crossversion::is_compatible(
+                                &address,
+                                legacy.protocol,
+                            ) =>
+                        {
+                            Ping::Ok {
+                                motd: Text::literal(legacy.motd),
+                                players: Some((
+                                    i64::from(legacy.players),
+                                    i64::from(legacy.max_players),
+                                )),
+                                player_list: Vec::new(),
+                                ms: 0,
+                                version: legacy.version,
+                            }
+                        }
                         Ok(legacy) => Ping::Incompatible {
                             motd: Text::literal(legacy.motd),
                             players: Some((

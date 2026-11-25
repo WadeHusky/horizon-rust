@@ -6,6 +6,9 @@
 //! Online-mode servers need the Microsoft account the launcher signed in
 //! (crate::auth): the login joins the server through the session service and
 //! encrypts the connection (ClientHandshakePacketListenerImpl.handleHello).
+pub mod crossversion;
+pub mod crossversion_decisions;
+
 use crate::auth::AuthSession;
 use horizon_protocol::{
     PROTOCOL_VERSION,
@@ -205,9 +208,11 @@ impl Session {
         let thread = std::thread::Builder::new()
             .name("horizon-net".into())
             .spawn(move || {
+                let routed_address =
+                    crossversion::route(&address_owned).unwrap_or_else(|| address_owned.clone());
                 let result = run(
                     local,
-                    &address_owned,
+                    &routed_address,
                     &name_owned,
                     auth.as_deref(),
                     info,
@@ -221,6 +226,7 @@ impl Session {
                     &resources,
                     lan,
                 );
+                crossversion::session_ended(&routed_address);
                 let from_server = result.is_ok();
                 let why = result.unwrap_or_else(|e| e);
                 if let Some(w) = thread_writer.lock().unwrap().take() {
