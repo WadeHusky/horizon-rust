@@ -1308,8 +1308,7 @@ pub(crate) mod v1_21_5 {
 /// Entity data (`remap_entity_data`) moves the indexes of the classes the 1.21.4 wiki lists (its index numbers
 /// counted by hierarchy).
 ///
-/// Not translated (see the TODOs): the cooldown, whose item id 1.21.5 sends as an identifier (the item's name is
-/// needed: `ids.item` and the registry).
+/// Cooldowns: the numeric item id is mapped through the pinned item registry to the cooldown group identifier.
 pub(crate) mod v1_21_4 {
     use super::*;
     use crate::entity_data::{Value, serializer};
