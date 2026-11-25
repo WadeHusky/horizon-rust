@@ -9,7 +9,7 @@ use std::{
     collections::{HashMap, VecDeque},
     sync::{
         Arc, Mutex,
-        atomic::{AtomicU8, Ordering},
+        atomic::{AtomicI32, AtomicU8, Ordering},
     },
 };
 
@@ -55,6 +55,8 @@ pub struct Session {
     pub(super) incoming: Mutex<VecDeque<(i32, Vec<u8>)>>,
     /// Packet bodies to send right after the one being sent.
     pub(super) outgoing: Mutex<Vec<Vec<u8>>>,
+    /// The next global player-chat index expected by 26.3 when an older server does not send one.
+    pub(super) player_chat_index: AtomicI32,
     /// The pinned built-in registries, needed to turn an older server's numeric cooldown item into its name.
     pub(super) builtin: Option<Arc<Builtin>>,
 }
@@ -73,6 +75,7 @@ impl Session {
             kinds: Mutex::new(HashMap::new()),
             incoming: Mutex::new(VecDeque::new()),
             outgoing: Mutex::new(Vec::new()),
+            player_chat_index: AtomicI32::new(0),
             builtin,
         }
     }
@@ -87,6 +90,12 @@ impl Session {
     }
     fn set_writing(&self, state: State) {
         self.writing.store(to_u8(state), Ordering::Release);
+    }
+    pub(super) fn next_player_chat_index(&self) -> i32 {
+        self.player_chat_index.fetch_add(1, Ordering::Relaxed)
+    }
+    fn reset_player_chat_index(&self) {
+        self.player_chat_index.store(0, Ordering::Relaxed);
     }
 
     /// A packet the server sent, as the pinned version numbers and lays it out. `None` drops it: Horizon
@@ -104,7 +113,11 @@ impl Session {
                 self.set_reading(State::Play)
             }
             (State::Play, ids::play::clientbound::START_CONFIGURATION) => {
+                self.reset_player_chat_index();
                 self.set_reading(State::Configuration)
+            }
+            (State::Play, ids::play::clientbound::LOGIN) => {
+                self.reset_player_chat_index()
             }
             _ => {}
         }
@@ -232,6 +245,45 @@ mod tests {
         assert_eq!(r.u16().unwrap(), 25565);
         assert_eq!(r.varint().unwrap(), handshake::LOGIN);
         assert_eq!((s.reading(), s.writing()), (State::Login, State::Login));
+    }
+
+    #[test]
+    fn a_1_21_4_player_chat_gets_a_sequential_global_index_reset_by_reconfiguration() {
+        let s = Session::new(ServerVersion::V1_21_4);
+        s.set_reading(State::Play);
+        let version = ServerVersion::V1_21_4;
+        let chat = version
+            .clientbound_id_down(State::Play, ids::play::clientbound::PLAYER_CHAT)
+            .unwrap();
+
+        for (expected, payload) in [(0, vec![0xaa]), (1, vec![0xbb])] {
+            let (id, translated) = s.clientbound(chat, payload.clone()).unwrap().unwrap();
+            assert_eq!(id, ids::play::clientbound::PLAYER_CHAT);
+            let mut r = Reader::new(&translated);
+            assert_eq!(r.varint().unwrap(), expected);
+            assert_eq!(r.rest(), payload);
+        }
+
+        let start_configuration = version
+            .clientbound_id_down(State::Play, ids::play::clientbound::START_CONFIGURATION)
+            .unwrap();
+        s.clientbound(start_configuration, Vec::new()).unwrap();
+        assert_eq!(s.reading(), State::Configuration);
+
+        let finish_configuration = version
+            .clientbound_id_down(
+                State::Configuration,
+                ids::configuration::clientbound::FINISH_CONFIGURATION,
+            )
+            .unwrap();
+        s.clientbound(finish_configuration, Vec::new()).unwrap();
+        assert_eq!(s.reading(), State::Play);
+
+        let (id, translated) = s.clientbound(chat, vec![0xcc]).unwrap().unwrap();
+        assert_eq!(id, ids::play::clientbound::PLAYER_CHAT);
+        let mut r = Reader::new(&translated);
+        assert_eq!(r.varint().unwrap(), 0);
+        assert_eq!(r.rest(), &[0xcc]);
     }
 
     #[test]
