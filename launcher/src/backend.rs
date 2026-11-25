@@ -2546,7 +2546,8 @@ impl Logged {
 
 // ----- Updates -----------------------------------------------------------------------------------
 
-/// What a check found: a Horizon build newer than every installed one, and a newer launcher.
+/// What a check found: a Horizon build newer than every installed one. Launcher self-updates
+/// are disabled; the launcher field is kept empty for serialized/API compatibility.
 #[derive(Clone, Debug, Default, serde::Serialize)]
 pub struct Updates {
     pub horizon: Option<Release>,
@@ -2579,19 +2580,17 @@ fn launcher_update_from(releases: &[Release], own: &str) -> Option<Release> {
         .cloned()
 }
 
-/// Load the game's release list and both update kinds from the same GitHub response.
-/// Publish the game releases before any fallback lookups for older launcher tags, so those
-/// lookups cannot hold up the release pages or opening animation. A list error reaches both.
+/// Load the game's release list and check only for Horizon game updates.
+/// Launcher releases are not queried: this fork installs launcher builds manually.
 pub fn releases_and_updates(
     on_releases: impl FnOnce(Result<Vec<Release>, String>),
 ) -> Result<Updates, String> {
-    releases_and_updates_with(release_list, installed, launcher_releases_in, on_releases)
+    releases_and_updates_with(release_list, installed, on_releases)
 }
 
 fn releases_and_updates_with(
     load: impl FnOnce() -> Result<serde_json::Value, String>,
     installed: impl FnOnce() -> Vec<String>,
-    launchers: impl FnOnce(&serde_json::Value) -> Vec<Release>,
     on_releases: impl FnOnce(Result<Vec<Release>, String>),
 ) -> Result<Updates, String> {
     let list = match load() {
@@ -2606,11 +2605,11 @@ fn releases_and_updates_with(
     on_releases(Ok(releases));
     Ok(Updates {
         horizon,
-        launcher: launcher_update(&launchers(&list)),
+        launcher: None,
     })
 }
 
-/// A fresh release-list request for both kinds of update (plus older-launcher fallback if needed).
+/// A fresh release-list request for Horizon game updates only.
 pub fn check_updates() -> Result<Updates, String> {
     releases_and_updates(|_| {})
 }
