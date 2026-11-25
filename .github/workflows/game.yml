@@ -16,6 +16,11 @@ on:
         description: Horizon's release whose files the client goes into (nightly = Horizon's current Nightly)
         default: nightly
         required: true
+  # Also build/publish when this workflow is deliberately updated on main.
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/game.yml"
 
 permissions:
   contents: read
@@ -24,7 +29,7 @@ concurrency:
   group: game-nightly
 
 env:
-  UPSTREAM: ${{ inputs.upstream }}
+  UPSTREAM: ${{ inputs.upstream || 'nightly' }}
   HORIZON_TELEMETRY_URL: "off"
 
 jobs:
