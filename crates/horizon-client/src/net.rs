@@ -738,7 +738,8 @@ fn older_server(address: &str) -> Option<horizon_protocol::adapter::ServerVersio
         return None;
     };
     match ServerVersion::from_protocol(protocol) {
-        Some(version) if version != ServerVersion::Current => {
+        Some(ServerVersion::Current) => None,
+        Some(version) => {
             if older_server_allowed(version, setting.as_deref()) {
                 Some(version)
             } else {
@@ -750,7 +751,6 @@ fn older_server(address: &str) -> Option<horizon_protocol::adapter::ServerVersio
                 None
             }
         }
-        Some(ServerVersion::Current) => None,
         None => {
             log::warn!("Server {address} reports unsupported protocol {protocol}");
             None
