@@ -216,6 +216,25 @@ mod tests {
     }
 
     #[test]
+    fn the_1_21_4_handshake_announces_protocol_769() {
+        let s = Session::new(ServerVersion::V1_21_4);
+        let mut payload = Writer::new();
+        payload.varint(crate::PROTOCOL_VERSION);
+        payload.string("localhost");
+        payload.u16(25565);
+        payload.varint(handshake::LOGIN);
+
+        let sent = s.serverbound(&body(0, &payload.data)).unwrap().unwrap();
+        let mut r = Reader::new(&sent);
+        assert_eq!(r.varint().unwrap(), 0);
+        assert_eq!(r.varint().unwrap(), 769);
+        assert_eq!(r.string(255).unwrap(), "localhost");
+        assert_eq!(r.u16().unwrap(), 25565);
+        assert_eq!(r.varint().unwrap(), handshake::LOGIN);
+        assert_eq!((s.reading(), s.writing()), (State::Login, State::Login));
+    }
+
+    #[test]
     fn each_direction_follows_its_own_switches() {
         let s = Session::new(ServerVersion::V26_2);
         s.set_reading(State::Login);
