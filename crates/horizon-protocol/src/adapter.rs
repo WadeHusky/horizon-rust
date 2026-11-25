@@ -552,6 +552,57 @@ mod tests {
     }
 
     #[test]
+    fn a_1_21_4_server_uses_protocol_769_and_its_own_packet_ids() {
+        let v = ServerVersion::V1_21_4;
+        assert_eq!(v.protocol(), 769);
+        assert_eq!(v.name(), "1.21.4");
+
+        // Protocol 769's clientbound keep_alive is 39; 26.3's is 45.
+        assert_eq!(
+            v.clientbound_id(State::Play, 39),
+            Some(ids::play::clientbound::KEEP_ALIVE)
+        );
+        // 26.3's serverbound keep_alive is 28; protocol 769 expects 30.
+        assert_eq!(
+            v.serverbound_id(State::Play, ids::play::serverbound::KEEP_ALIVE),
+            Some(30)
+        );
+
+        // 1.21.4 has no packet for the 26.3-only post-effects update.
+        assert_eq!(
+            v.clientbound_id_down(State::Play, ids::play::clientbound::POST_EFFECTS),
+            None
+        );
+    }
+
+    #[test]
+    fn a_1_21_4_serverbound_packet_body_keeps_its_payload_when_renumbered() {
+        let mut body = Vec::new();
+        write_varint(&mut body, ids::play::serverbound::KEEP_ALIVE);
+        body.extend_from_slice(&[1, 2, 3]);
+
+        assert_eq!(
+            ServerVersion::V1_21_4
+                .serverbound_body(State::Play, &body)
+                .unwrap(),
+            Some(vec![30, 1, 2, 3])
+        );
+    }
+
+    #[test]
+    fn a_1_21_4_registry_remap_covers_block_states_and_items() {
+        let ids = ServerVersion::V1_21_4.ids().unwrap();
+
+        assert_eq!(ids.states, (27_866, 35_723));
+        // The first shifted block state and item IDs, from the generated vanilla registry reports.
+        assert_eq!(ids.block_state.up(27), Some(28));
+        assert_eq!(ids.block_state.down(28), Some(27));
+        assert_eq!(ids.item.up(26), Some(53));
+        assert_eq!(ids.item.down(53), Some(26));
+        assert!(ids.quirks.components_before_1_21_6);
+    }
+
+    #[test]
     fn renumbered_clientbound_play_packets_reach_their_26_3_ids() {
         let v = ServerVersion::V26_2;
         // keep_alive 44 -> 45, login 49 -> 50, respawn 82 -> 84, clear_dialog 139 -> 142.
