@@ -394,8 +394,16 @@ impl Connection {
     /// Speak to a server of `version` from now on (before the handshake): packets are renumbered both
     /// ways (crate::adapter). The pinned version needs nothing.
     pub fn adapt(&mut self, version: crate::adapter::ServerVersion) {
+        self.adapt_with_builtin(version, None);
+    }
+    /// As `Self::adapt`, with the pinned registries needed by legacy packets whose ids become names.
+    pub fn adapt_with_builtin(
+        &mut self,
+        version: crate::adapter::ServerVersion,
+        builtin: Option<Arc<crate::registry::Builtin>>,
+    ) {
         let session = (version != crate::adapter::ServerVersion::Current)
-            .then(|| Arc::new(crate::adapter::Session::new(version)));
+            .then(|| Arc::new(crate::adapter::Session::with_builtin(version, builtin)));
         self.reader.adapter = session.clone();
         self.writer.adapter = session;
     }
