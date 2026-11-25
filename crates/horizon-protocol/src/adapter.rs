@@ -568,6 +568,11 @@ mod tests {
             Some(26)
         );
 
+        // Its cooldown packet is 23; 26.3's packet id is 22.
+        assert_eq!(
+            v.clientbound_id_down(State::Play, ids::play::clientbound::COOLDOWN),
+            Some(23)
+        );
         // 1.21.4 has no packet for the 26.3-only post-effects update.
         assert_eq!(
             v.clientbound_id_down(State::Play, ids::play::clientbound::POST_EFFECTS),
