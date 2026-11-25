@@ -691,22 +691,39 @@ fn connect_tcp(
     Ok((c, host, port))
 }
 
-/// Whether joining servers of older releases is on (roadmap `older-servers`): off by default while the
-/// adapter is incomplete; `HORIZON_OLDER_SERVERS=1` turns it on.
+/// Whether every implemented older-server adapter is enabled
+/// (`HORIZON_OLDER_SERVERS=1`). The 1.21.4 adapter is enabled by default;
+/// `HORIZON_OLDER_SERVERS=0` disables all older-server adapters.
 pub fn older_servers_enabled() -> bool {
     std::env::var_os("HORIZON_OLDER_SERVERS").is_some_and(|v| v == "1")
 }
 
+/// Whether to adapt one server release under the current environment policy. 1.21.4 is the
+/// default-supported legacy protocol; other implemented releases require the explicit opt-in.
+fn older_server_allowed(
+    version: horizon_protocol::adapter::ServerVersion,
+    setting: Option<&str>,
+) -> bool {
+    use horizon_protocol::adapter::ServerVersion;
+    match setting {
+        Some("0") => false,
+        Some("1") => version != ServerVersion::Current,
+        _ => version == ServerVersion::V1_21_4,
+    }
+}
+
 /// The older release a server speaks, by its status ping, when Horizon can translate it; `None` for the
-/// pinned version, an unknown one, a failed ping, or with the feature off.
+/// pinned version, an unknown one, a failed ping, or a version not enabled by the current policy.
 fn older_server(address: &str) -> Option<horizon_protocol::adapter::ServerVersion> {
     use horizon_protocol::adapter::ServerVersion;
-    if !older_servers_enabled() {
+    let setting = std::env::var("HORIZON_OLDER_SERVERS").ok();
+    if setting.as_deref() == Some("0") {
         return None;
     }
     let (json, _) = ping(address, Duration::from_secs(5)).ok()?;
     let protocol = i32::try_from(json["version"]["protocol"].as_i64()?).ok()?;
-    ServerVersion::from_protocol(protocol).filter(|v| *v != ServerVersion::Current)
+    ServerVersion::from_protocol(protocol)
+        .filter(|v| *v != ServerVersion::Current && older_server_allowed(*v, setting.as_deref()))
 }
 
 /// `Connection.exceptionCaught`: a read that timed out ends with
@@ -1473,6 +1490,31 @@ fn continues_after_failed_join(lan: bool, signed_in: bool) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn older_server_policy_defaults_to_protocol_769_only() {
+        use horizon_protocol::adapter::ServerVersion as V;
+
+        assert_eq!(V::from_protocol(769), Some(V::V1_21_4));
+        assert!(older_server_allowed(V::V1_21_4, None));
+        assert!(!older_server_allowed(V::V1_21_3, None));
+        assert!(!older_server_allowed(V::V1_21_5, None));
+        assert!(!older_server_allowed(V::Current, None));
+    }
+
+    #[test]
+    fn older_server_policy_can_be_overridden() {
+        use horizon_protocol::adapter::ServerVersion as V;
+
+        assert!(older_server_allowed(V::V1_21_4, Some("1")));
+        assert!(older_server_allowed(V::V1_21_3, Some("1")));
+        assert!(older_server_allowed(V::V1_20_6, Some("1")));
+        assert!(!older_server_allowed(V::Current, Some("1")));
+
+        assert!(!older_server_allowed(V::V1_21_4, Some("0")));
+        assert!(!older_server_allowed(V::V1_21_3, Some("0")));
+        assert!(!older_server_allowed(V::V1_20_6, Some("0")));
+    }
 
     fn pack(namespace: &str, id: &str, version: &str) -> cfg::KnownPack {
         cfg::KnownPack {
