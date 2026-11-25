@@ -17,11 +17,12 @@ ViaVersion installation for this route. ViaProxy is the standalone protocol
 translator between Horizon and the Velocity listener. It reads the protocol
 advertised by that listener and uses it as the target version.
 
-Velocity's compatibility documentation lists Minecraft 1.7.2 through 26.3.
-ViaProxy's own supported client range starts at 1.7.2 and its server range
-covers release versions 1.0 through 26.3. The exact version range reachable
-through a particular Velocity network still depends on that proxy's setup and
-the backend servers behind it.
+The server setup described here uses Velocity for Minecraft 1.7.2 through
+1.21.11. Velocity's general compatibility documentation lists Minecraft 1.7.2
+through 26.3. ViaProxy's own supported client range starts at 1.7.2 and its
+server range covers release versions 1.0 through 26.3. The exact versions
+reachable through a particular Velocity network still depend on that proxy's
+setup and the backend servers behind it.
 
 ## Runtime behavior
 
