@@ -847,7 +847,7 @@ enum Cmd {
         #[arg(long)]
         crash: bool,
     },
-    /// Look for a newer Horizon release and launcher, and install them
+    /// Look for a newer Horizon game release and install it; launcher updates are manual
     Update {
         /// Only report what is available
         #[arg(long)]
