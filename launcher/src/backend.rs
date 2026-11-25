@@ -370,6 +370,7 @@ pub(crate) fn parse_releases(
     out
 }
 
+#[cfg(test)]
 fn is_launcher_tag(tag: &str) -> bool {
     launcher_version(tag).is_some()
 }
@@ -400,16 +401,8 @@ pub(crate) fn game_releases(list: &serde_json::Value) -> Vec<Release> {
     out
 }
 
-/// The launcher releases in `list` (the newest 100 releases). Game releases come out several times
-/// a day, so the newest launcher release can be older than all of those: then the newest
-/// `launcher@` and `launcher-v` tags are looked up one by one (a draft's tag is skipped: it has no
-/// public release).
-fn launcher_releases_in(list: &serde_json::Value) -> Vec<Release> {
-    launcher_releases_in_with(list, |url| {
-        get(&url)?.into_json().map_err(|e| e.to_string())
-    })
-}
-
+/// Legacy launcher-release lookup, retained only for unit tests of release parsing.
+#[cfg(test)]
 fn launcher_releases_in_with(
     list: &serde_json::Value,
     json: impl Fn(String) -> Result<serde_json::Value, String>,
@@ -444,6 +437,7 @@ fn launcher_releases_in_with(
 }
 
 /// The launcher tags in GitHub's matching-refs answer, newest first.
+#[cfg(test)]
 fn newest_launcher_tags(refs: &serde_json::Value) -> Vec<String> {
     let mut tags: Vec<String> = refs
         .as_array()
