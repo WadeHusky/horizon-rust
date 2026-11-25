@@ -365,6 +365,7 @@ fn write_viaproxy_yml(
     port: u16,
     version: Option<&str>,
 ) -> Result<(), String> {
+    let target = target.replace('\\', "\\\\").replace('"', "\\\"");
     let body = format!(
         "bind-address: \"127.0.0.1:{port}\"\ntarget-address: \"{target}\"\n\
          target-version: \"{}\"\nauth-method: NONE\nproxy-online-mode: false\n",
