@@ -190,6 +190,31 @@ pub fn clientbound(
             }
             strip_id(p.encode())
         }
+        // 1.21.4 identifies a cooldown by numeric item id; 26.3 identifies the cooldown group by name.
+        (State::Play, cb::COOLDOWN) if session.version == ServerVersion::V1_21_4 => {
+            let mut r = Reader::new(payload);
+            let old_item = r.varint()?;
+            let duration = r.varint()?;
+            if r.remaining() != 0 {
+                return Err(crate::Error::new("1.21.4 cooldown has trailing bytes"));
+            }
+            let Some(item) = ids.item.up(old_item) else {
+                return Ok(None);
+            };
+            let Some(group) = session
+                .builtin
+                .as_ref()
+                .and_then(|builtin| builtin.get("minecraft:item"))
+                .and_then(|items| items.name(item))
+            else {
+                // Without the prepared registry, passing the numeric payload to an identifier codec is unsafe.
+                return Ok(None);
+            };
+            let mut w = Writer::new();
+            w.string(group);
+            w.varint(duration);
+            w.data
+        }
         (State::Play, cb::SET_ENTITY_DATA) if session.version.at_most(ServerVersion::V1_21_11) => {
             let mut p = decode_play(ids, id, payload)?;
             if let play::Clientbound::SetEntityData(d) = &mut p {
@@ -2274,6 +2299,61 @@ pub(crate) mod v1_21_1 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_1_21_4_cooldown_item_id_becomes_the_pinned_item_name() {
+        use std::sync::Arc;
+
+        let mut item_names = vec!["minecraft:unused".to_owned(); 54];
+        item_names[53] = "minecraft:ender_pearl".to_owned();
+        let mut builtin = crate::registry::Builtin::default();
+        builtin.registries.insert(
+            "minecraft:item".to_owned(),
+            crate::registry::Ids::from_names(item_names),
+        );
+        let session = Session::with_builtin(
+            ServerVersion::V1_21_4,
+            Some(Arc::new(builtin)),
+        );
+
+        let mut payload = Writer::new();
+        payload.varint(26); // 1.21.4 item id; it maps to pinned item id 53.
+        payload.varint(40); // 2 seconds at 20 ticks per second.
+
+        let (id, body) = clientbound(
+            &session,
+            State::Play,
+            packet_ids::play::clientbound::COOLDOWN,
+            &payload.data,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(id, packet_ids::play::clientbound::COOLDOWN);
+        let body = body.expect("cooldown payload translated");
+        let mut r = Reader::new(&body);
+        assert_eq!(r.string(32767).unwrap(), "minecraft:ender_pearl");
+        assert_eq!(r.varint().unwrap(), 40);
+        assert_eq!(r.remaining(), 0);
+    }
+
+    #[test]
+    fn a_1_21_4_cooldown_without_a_registry_name_is_dropped_safely() {
+        let session = Session::new(ServerVersion::V1_21_4);
+        let mut payload = Writer::new();
+        payload.varint(26);
+        payload.varint(40);
+
+        assert_eq!(
+            clientbound(
+                &session,
+                State::Play,
+                packet_ids::play::clientbound::COOLDOWN,
+                &payload.data,
+            )
+            .unwrap(),
+            None
+        );
+    }
 
     #[test]
     fn a_1_21_11_unknown_entity_is_dropped_and_vanilla_entities_are_remapped() {
