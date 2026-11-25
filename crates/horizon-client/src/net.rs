@@ -717,6 +717,9 @@ fn older_server_allowed(
 fn older_server(address: &str) -> Option<horizon_protocol::adapter::ServerVersion> {
     use horizon_protocol::adapter::ServerVersion;
     let setting = std::env::var("HORIZON_OLDER_SERVERS").ok();
+    if setting.as_deref() == Some("0") {
+        return None;
+    }
     let (json, _) = ping(address, Duration::from_secs(5)).ok()?;
     let protocol = i32::try_from(json["version"]["protocol"].as_i64()?).ok()?;
     ServerVersion::from_protocol(protocol)
