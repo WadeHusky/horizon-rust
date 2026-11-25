@@ -796,7 +796,8 @@ fn run(
             log::info!("Joining {address} as a {} server", version.name());
             // 1.21.4's cooldown packet names an item by numeric id; 26.3 names its cooldown group.
             // Resolve the pinned item ids once from the resources prepared by the launcher.
-            let builtin = (version == horizon_protocol::adapter::ServerVersion::V1_21_4)
+            let builtin = version
+                .at_most(horizon_protocol::adapter::ServerVersion::V1_21_4)
                 .then(|| {
                     Builtin::find(resources)
                         .and_then(|path| Builtin::load(&path).ok())
