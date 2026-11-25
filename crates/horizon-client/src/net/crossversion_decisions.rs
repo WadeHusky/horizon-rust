@@ -37,7 +37,7 @@ mod tests {
             "description": {"text": "A server"},
         });
         let out = badge(json, "example.test");
-        assert_eq!(out["version"]["protocol"], 777);
+        assert_eq!(out["version"]["protocol"], GAME_PROTOCOL);
         let lines = out["description"].as_array().unwrap();
         assert_eq!(lines[0]["text"], "1.20.1 · via ViaProxy\n");
         assert_eq!(lines[0]["color"], "green");
@@ -47,7 +47,7 @@ mod tests {
     #[test]
     fn the_badge_leaves_this_version_alone() {
         let json = serde_json::json!({
-            "version": {"name": "26.3", "protocol": 777},
+            "version": {"name": "26.3", "protocol": GAME_PROTOCOL},
             "description": "hi",
         });
         assert_eq!(badge(json.clone(), "example.test"), json);
