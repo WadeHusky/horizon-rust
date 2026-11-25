@@ -190,6 +190,33 @@ pub fn clientbound(
             }
             strip_id(p.encode())
         }
+        // Before 1.21.3, cooldowns identify an item by numeric registry id; 26.3 uses its identifier.
+        (State::Play, cb::COOLDOWN)
+            if session.version.at_most(ServerVersion::V1_21_1) =>
+        {
+            let mut r = Reader::new(payload);
+            let old_item = r.varint()?;
+            let duration = r.varint()?;
+            if r.remaining() != 0 {
+                return Err(crate::Error::new("legacy cooldown has trailing bytes"));
+            }
+            let Some(item) = ids.item.up(old_item) else {
+                return Ok(None);
+            };
+            let Some(group) = session
+                .builtin
+                .as_ref()
+                .and_then(|builtin| builtin.get("minecraft:item"))
+                .and_then(|items| items.name(item))
+            else {
+                // Without the prepared registry, passing the numeric payload to an identifier codec is unsafe.
+                return Ok(None);
+            };
+            let mut w = Writer::new();
+            w.string(group);
+            w.varint(duration);
+            w.data
+        }
         (State::Play, cb::SET_ENTITY_DATA) if session.version.at_most(ServerVersion::V1_21_11) => {
             let mut p = decode_play(ids, id, payload)?;
             if let play::Clientbound::SetEntityData(d) = &mut p {
@@ -1283,8 +1310,7 @@ pub(crate) mod v1_21_5 {
 /// Entity data (`remap_entity_data`) moves the indexes of the classes the 1.21.4 wiki lists (its index numbers
 /// counted by hierarchy).
 ///
-/// Not translated (see the TODOs): the cooldown, whose item id 1.21.5 sends as an identifier (the item's name is
-/// needed: `ids.item` and the registry).
+/// Cooldowns: pre-1.21.3 item ids are mapped through the pinned item registry; 1.21.3+ already sends identifiers.
 pub(crate) mod v1_21_4 {
     use super::*;
     use crate::entity_data::{Value, serializer};
@@ -2274,6 +2300,75 @@ pub(crate) mod v1_21_1 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_1_21_1_cooldown_item_id_becomes_the_pinned_item_name() {
+        use std::sync::Arc;
+
+        let mut item_names = vec!["minecraft:unused".to_owned(); 54];
+        item_names[53] = "minecraft:test_item".to_owned();
+        let mut builtin = crate::registry::Builtin::default();
+        builtin.registries.insert(
+            "minecraft:item".to_owned(),
+            crate::registry::Ids::from_names(item_names),
+        );
+        let session = Session::with_builtin(
+            ServerVersion::V1_21_1,
+            Some(Arc::new(builtin)),
+        );
+
+        let mut payload = Writer::new();
+        payload.varint(26); // 1.21.1 item id; it maps to pinned item id 53.
+        payload.varint(40); // 2 seconds at 20 ticks per second.
+
+        let (id, body) = clientbound(
+            &session,
+            State::Play,
+            packet_ids::play::clientbound::COOLDOWN,
+            &payload.data,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(id, packet_ids::play::clientbound::COOLDOWN);
+        let body = body.expect("cooldown payload translated");
+        let mut r = Reader::new(&body);
+        assert_eq!(r.string(32767).unwrap(), "minecraft:test_item");
+        assert_eq!(r.varint().unwrap(), 40);
+        assert_eq!(r.remaining(), 0);
+    }
+
+    #[test]
+    fn a_1_21_1_cooldown_without_a_registry_name_is_dropped_safely() {
+        let session = Session::new(ServerVersion::V1_21_1);
+        let mut payload = Writer::new();
+        payload.varint(26);
+        payload.varint(40);
+
+        assert_eq!(
+            clientbound(
+                &session,
+                State::Play,
+                packet_ids::play::clientbound::COOLDOWN,
+                &payload.data,
+            )
+            .unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn a_1_21_4_cooldown_identifier_is_passed_through_unchanged() {
+        let session = Session::new(ServerVersion::V1_21_4);
+        let mut payload = Writer::new();
+        payload.string("minecraft:test_item");
+        payload.varint(40);
+
+        let id = packet_ids::play::clientbound::COOLDOWN;
+        assert_eq!(
+            clientbound(&session, State::Play, id, &payload.data).unwrap(),
+            Some((id, None))
+        );
+    }
 
     #[test]
     fn a_1_21_11_unknown_entity_is_dropped_and_vanilla_entities_are_remapped() {

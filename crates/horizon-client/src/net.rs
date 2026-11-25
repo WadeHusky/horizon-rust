@@ -13,8 +13,8 @@ use horizon_protocol::{
     buf::Reader,
     connection::{ConnReader, ConnWriter, Connection, Counters},
     crypto::{generate_secret, offline_uuid, server_hash},
-    packets::{Empty, configuration as cfg, handshake, login, play},
-    registry::Dynamic,
+    packets::{Empty, configuration as cfg, handshake, login, play, status},
+    registry::{Builtin, Dynamic},
     rsa::RsaPublicKey,
     servers::parse_address,
     text::{Language, plain, translatable},
@@ -794,7 +794,17 @@ fn run(
             && let Some(version) = older_server(address)
         {
             log::info!("Joining {address} as a {} server", version.name());
-            c.adapt(version);
+            // Before 1.21.3, cooldown packets carry numeric item ids; 26.3 expects a group identifier.
+            // Resolve pinned item names only for those older server protocols.
+            let builtin = version
+                .at_most(horizon_protocol::adapter::ServerVersion::V1_21_1)
+                .then(|| {
+                    Builtin::find(resources)
+                        .and_then(|path| Builtin::load(&path).ok())
+                        .map(Arc::new)
+                })
+                .flatten();
+            c.adapt_with_builtin(version, builtin);
         }
         (host, port, c)
     };
@@ -1789,11 +1799,61 @@ mod tests {
                 Arc::new(Language::new()),
                 PathBuf::new(),
             );
+            // The login TCP socket is opened first, but its handshake waits for version detection.
+            let (login_stream, _) = listener.accept().unwrap();
+            login_stream
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+
+            // A second socket carries the status probe used to select a legacy protocol adapter.
             let (stream, _) = listener.accept().unwrap();
             stream
                 .set_read_timeout(Some(Duration::from_secs(5)))
                 .unwrap();
-            let mut server = Connection::from_stream(stream).unwrap();
+            let mut status_server = Connection::from_stream(stream).unwrap();
+            let (id, body) = status_server.recv().unwrap();
+            let handshake::Serverbound::Intention(packet) =
+                handshake::Serverbound::decode(id, &body).unwrap()
+            else {
+                panic!("expected status handshake")
+            };
+            assert_eq!((packet.host.as_str(), packet.port), ("localhost", port));
+            assert_eq!(packet.intent, handshake::STATUS);
+            let (id, body) = status_server.recv().unwrap();
+            assert!(matches!(
+                status::Serverbound::decode(id, &body).unwrap(),
+                status::Serverbound::StatusRequest(_)
+            ));
+            status_server
+                .send(
+                    &status::Clientbound::StatusResponse(status::StatusResponse {
+                        json: serde_json::json!({
+                            "version": {
+                                "name": horizon_protocol::GAME_VERSION,
+                                "protocol": PROTOCOL_VERSION
+                            }
+                        })
+                        .to_string(),
+                    })
+                    .encode(),
+                )
+                .unwrap();
+            let (id, body) = status_server.recv().unwrap();
+            let status::Serverbound::PingRequest(ping) =
+                status::Serverbound::decode(id, &body).unwrap()
+            else {
+                panic!("expected status ping")
+            };
+            status_server
+                .send(
+                    &status::Clientbound::PongResponse(status::Ping { time: ping.time })
+                        .encode(),
+                )
+                .unwrap();
+            drop(status_server);
+
+            // Version detection is complete; the already-open login socket now sends its handshake.
+            let mut server = Connection::from_stream(login_stream).unwrap();
             let (id, body) = server.recv().unwrap();
             let handshake::Serverbound::Intention(packet) =
                 handshake::Serverbound::decode(id, &body).unwrap()

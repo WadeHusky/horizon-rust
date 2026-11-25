@@ -1,0 +1,44 @@
+name: protocol
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - Cargo.toml
+      - Cargo.lock
+      - crates/**
+      - tools/ci/apt_install.sh
+      - .github/workflows/protocol.yml
+  pull_request:
+    paths:
+      - Cargo.toml
+      - Cargo.lock
+      - crates/**
+      - tools/ci/apt_install.sh
+      - .github/workflows/protocol.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: protocol-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: .
+      - name: Linux libraries
+        run: bash tools/ci/apt_install.sh libasound2-dev libudev-dev
+      - name: Test the protocol crate
+        run: cargo test --locked -p horizon-protocol
+      - name: Test the client binary and integration targets
+        run: cargo test --locked -p horizon-client --lib --bins --tests
+      - name: Test the client library
+        run: cargo test --locked -p horizon-client-lib --lib
