@@ -229,6 +229,19 @@ fn favicon_bytes(json: &serde_json::Value) -> Option<Vec<u8>> {
         .replace('\n', "");
     crate::skins::base64_decode(&base64)
 }
+/// Whether a server-list status response speaks a protocol this build can join.
+/// Keep this on the same environment policy as the actual login handshake: 1.21.4 is
+/// enabled by default, other older protocols require HORIZON_OLDER_SERVERS=1.
+fn status_protocol_joinable(protocol: i64, setting: Option<&str>) -> bool {
+    use horizon_protocol::adapter::ServerVersion;
+
+    protocol == i64::from(horizon_protocol::PROTOCOL_VERSION)
+        || i32::try_from(protocol)
+            .ok()
+            .and_then(ServerVersion::from_protocol)
+            .is_some_and(|version| crate::net::older_server_allowed(version, setting))
+}
+
 fn ping_all(servers: &[ServerEntry], pings: &Pings, icons: &Icons, file: &Path) {
     for s in servers {
         let address = s.ip.clone();
@@ -282,15 +295,10 @@ fn ping_all(servers: &[ServerEntry], pings: &Pings, icons: &Icons, file: &Path) 
                                 save_icon(&file, &address, icon);
                             }
                         }
-                        // OnlineServerEntry: SUCCESSFUL only for this game's protocol.
-                        let joinable = protocol == i64::from(horizon_protocol::PROTOCOL_VERSION)
-                            || (crate::net::older_servers_enabled()
-                                && i32::try_from(protocol)
-                                    .ok()
-                                    .and_then(
-                                        horizon_protocol::adapter::ServerVersion::from_protocol,
-                                    )
-                                    .is_some());
+                        // Use the same per-version policy as the connection path: 1.21.4
+                        // is allowed by default; other older adapters are opt-in.
+                        let setting = std::env::var("HORIZON_OLDER_SERVERS").ok();
+                        let joinable = status_protocol_joinable(protocol, setting.as_deref());
                         if joinable {
                             Ping::Ok {
                                 motd,
@@ -2971,5 +2979,17 @@ mod tests {
         screen.click(Some(42), 0.0, 0.0, size, &saves);
         assert_eq!(cycle(&screen).unwrap().3, "Server Resource Packs: Prompt");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+
+    #[test]
+    fn server_list_ping_uses_the_same_older_protocol_policy_as_login() {
+        use horizon_protocol::adapter::ServerVersion as V;
+
+        assert!(status_protocol_joinable(i64::from(horizon_protocol::PROTOCOL_VERSION), None));
+        assert!(status_protocol_joinable(i64::from(V::V1_21_4.protocol()), None));
+        assert!(!status_protocol_joinable(i64::from(V::V1_21_3.protocol()), None));
+        assert!(status_protocol_joinable(i64::from(V::V1_21_3.protocol()), Some("1")));
+        assert!(!status_protocol_joinable(i64::from(V::V1_21_4.protocol()), Some("0")));
     }
 }
