@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       upstream:
-        description: Horizon's release whose files the client goes into (nightly = Horizon's current Nightly)
+        description: Base release whose game files are repacked with this fork's client (nightly = current offline-launcher Nightly)
         default: nightly
         required: true
   # Also build/publish when this workflow is deliberately updated on main.
@@ -45,20 +45,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          name=$(gh api "repos/horizon-rust/horizon/releases/tags/$UPSTREAM" --jq .name)
-          echo "Horizon's $UPSTREAM: $name"
+          name=$(gh api "repos/gerdaroot/Horizon-Offline-Launcher/releases/tags/$UPSTREAM" --jq .name)
+          echo "Base release $UPSTREAM: $name"
           # Every platform takes the files of this one Nightly, even if Horizon publishes the next
           # while the clients build.
           mkdir upstream
           for asset in horizon-linux-x86_64.tar.gz horizon-windows-x64.zip horizon-macos-arm64.zip \
                        horizon-macos-x64.zip horizon-server-linux-x86_64.tar.gz; do
-            gh release download "$UPSTREAM" -R horizon-rust/horizon -D upstream -p "$asset"
+            gh release download "$UPSTREAM" -R gerdaroot/Horizon-Offline-Launcher -D upstream -p "$asset"
           done
           # Windows ARM64: only when Horizon's Nightly has it (its build may fail there too).
-          gh release download "$UPSTREAM" -R horizon-rust/horizon -D upstream -p horizon-windows-arm64.zip \
-            || echo "::warning::Horizon's $UPSTREAM has no horizon-windows-arm64.zip: this Nightly goes out without it"
-          [[ "$(gh api "repos/horizon-rust/horizon/releases/tags/$UPSTREAM" --jq .name)" == "$name" ]] \
-            || { echo "::error::Horizon's $UPSTREAM changed while downloading; run again"; exit 1; }
+          gh release download "$UPSTREAM" -R gerdaroot/Horizon-Offline-Launcher -D upstream -p horizon-windows-arm64.zip \
+            || echo "::warning::Base release $UPSTREAM has no horizon-windows-arm64.zip: this Nightly goes out without it"
+          [[ "$(gh api "repos/gerdaroot/Horizon-Offline-Launcher/releases/tags/$UPSTREAM" --jq .name)" == "$name" ]] \
+            || { echo "::error::Base release $UPSTREAM changed while downloading; run again"; exit 1; }
           {
             echo "date=$(date -u +%F)"
             echo "short=${GITHUB_SHA:0:7}"
