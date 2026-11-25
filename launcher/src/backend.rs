@@ -3405,6 +3405,11 @@ mod tests {
     use super::*;
     use std::cmp::Ordering::*;
 
+    #[test]
+    fn launcher_self_update_is_disabled() {
+        assert!(!self_update_allowed());
+    }
+
     /// A canonical path loses Windows' verbatim prefix on a drive (horizon-mixins' output
     /// check stats `\\?\C:`, the volume itself, which Windows refuses, os error 1), and keeps
     /// it where there is no drive form.
