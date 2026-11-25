@@ -263,8 +263,8 @@ minimize, maximize/restore and close; macOS and Linux keep their system title ba
 
 ## Updates
 
-The launcher looks for a newer Nightly when it starts and every 30 minutes while it is open, and
-shows a small "available, Install" line on Play.
+The launcher looks for a newer Horizon Nightly when it starts and every 30 minutes while it is open,
+and shows a small "available, Install" line on Play.
 
 The launcher does not install or apply its own updates. Install a newer launcher release manually;
 the running launcher binary is never replaced. The automatic Horizon game update setting is
