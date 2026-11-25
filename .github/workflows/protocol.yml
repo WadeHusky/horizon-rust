@@ -40,7 +40,5 @@ jobs:
         run: cargo test --locked -p horizon-protocol
       - name: Test the client binary and integration targets
         run: cargo test --locked -p horizon-client --lib --bins --tests
-      - name: Test the client library (excluding the timing-sensitive socket test)
-        run: cargo test --locked -p horizon-client-lib --lib -- --skip net::tests::direct_login_preserves_hostname_and_negotiates_brand
-      - name: Run the socket test in isolation
-        run: cargo test --locked -p horizon-client-lib --lib net::tests::direct_login_preserves_hostname_and_negotiates_brand -- --exact --test-threads=1
+      - name: Test the client library
+        run: cargo test --locked -p horizon-client-lib --lib
