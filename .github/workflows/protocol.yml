@@ -6,17 +6,15 @@ on:
     paths:
       - Cargo.toml
       - Cargo.lock
-      - crates/horizon-core/**
-      - crates/horizon-world/**
-      - crates/horizon-protocol/**
+      - crates/**
+      - tools/ci/apt_install.sh
       - .github/workflows/protocol.yml
   pull_request:
     paths:
       - Cargo.toml
       - Cargo.lock
-      - crates/horizon-core/**
-      - crates/horizon-world/**
-      - crates/horizon-protocol/**
+      - crates/**
+      - tools/ci/apt_install.sh
       - .github/workflows/protocol.yml
 
 permissions:
@@ -25,12 +23,14 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-22.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: .
-      - name: Test the protocol crate
-        run: cargo test --locked -p horizon-protocol
+      - name: Linux libraries
+        run: bash tools/ci/apt_install.sh libasound2-dev libudev-dev
+      - name: Test the client and protocol crates
+        run: cargo test --locked -p horizon-client -p horizon-client-lib -p horizon-protocol --lib --bins --tests
