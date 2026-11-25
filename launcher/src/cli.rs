@@ -1734,7 +1734,10 @@ fn update(check: bool, as_json: bool) -> Result<(), String> {
         }
     }
     match &updates.launcher {
-        None => println!("Launcher: {} is up to date.", backend::VERSION),
+        None => println!(
+            "Launcher: self-updates are disabled (running {}).",
+            backend::VERSION
+        ),
         Some(r) => {
             let version = backend::launcher_version(&r.tag).unwrap_or_default();
             if check {
