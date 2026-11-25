@@ -85,6 +85,8 @@ Your offline name is changed with the player button at the top right; its skin i
 
 **Will a jar of another version (1.21, say) work?** No. Horizon reproduces 26.3 exactly: its data and network protocol are tied to that version. The launcher checks the file's checksum and says so when the jar isn't the right one.
 
+**Can I join a Minecraft 1.21.4 server?** Yes. The client detects protocol 769 in the server's status response and automatically translates its packets and registry IDs. Other implemented older-server protocols remain opt-in with `HORIZON_OLDER_SERVERS=1`; set `HORIZON_OLDER_SERVERS=0` to disable older-server adapters. This does not make a `1.21.4.jar` usable: the game and its resources still run on 26.3. Non-vanilla trim materials and templates outside the known item set are not yet supported.
+
 **Preparing asks for Java.** Preparing needs Java 25. The launcher looks for it in other launchers and downloads it when it finds none. If that fails, install [Java 25](https://adoptium.net/temurin/releases/?version=25) and try again.
 
 **How do I play with friends?** Pause → Friends gives an invite code; LAN works too. Any server that lets players without an account in (`online-mode=false`) works; online-mode servers (Hypixel and the like) check every player's Minecraft license with Mojang and don't.
@@ -222,6 +224,8 @@ curl -fsSL https://github.com/gerdaroot/Horizon-Offline-Launcher/releases/latest
 ### Вопросы
 
 **Подойдёт jar другой версии, например 1.21?** Нет. Horizon воспроизводит именно 26.3, его данные и сетевой протокол привязаны к этой версии. Лаунчер проверяет контрольную сумму файла и, если jar не тот, прямо говорит об этом.
+
+**Можно подключиться к серверу Minecraft 1.21.4?** Да. Клиент распознаёт протокол 769 в ответе сервера на запрос статуса и автоматически переводит пакеты и ID реестров. Другие реализованные старые протоколы по-прежнему включаются только через `HORIZON_OLDER_SERVERS=1`; значение `HORIZON_OLDER_SERVERS=0` отключает все старые адаптеры. Это не позволяет использовать `1.21.4.jar`: сама игра и её ресурсы остаются на версии 26.3. Нестандартные материалы отделки и шаблоны, не входящие в известный набор ванильных предметов, пока не поддерживаются.
 
 **«Подготовка» просит Java.** Для подготовки нужна Java 25. Лаунчер ищет её у других лаунчеров и, если не находит, скачивает сам. Если не вышло, установите [Java 25](https://adoptium.net/temurin/releases/?version=25) и повторите.
 
