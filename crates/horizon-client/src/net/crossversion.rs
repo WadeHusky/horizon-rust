@@ -241,10 +241,29 @@ pub fn route(address: &str) -> Option<String> {
     }
 }
 
+/// Whether the server list should treat this address as joinable through ViaProxy.
+pub fn is_compatible(address: &str, protocol: i32) -> bool {
+    let settings = config();
+    if !settings.enabled {
+        return false;
+    }
+    settings
+        .servers
+        .iter()
+        .any(|(known, version)| known == address && version != "auto")
+        || protocol != horizon_protocol::PROTOCOL_VERSION
+}
+
 /// The server's protocol version from its status, if it answered.
 fn ping_protocol(address: &str) -> Option<i32> {
-    let (json, _) = crate::net::ping(address, PING_TIMEOUT).ok()?;
-    i32::try_from(json["version"]["protocol"].as_i64()?).ok()
+    if let Ok((json, _)) = crate::net::ping(address, PING_TIMEOUT) {
+        if let Some(protocol) = json["version"]["protocol"].as_i64() {
+            return i32::try_from(protocol).ok();
+        }
+    }
+    crate::net::ping_legacy(address, PING_TIMEOUT)
+        .ok()
+        .map(|status| status.protocol)
 }
 
 /// A session ended. A transfer ends one session and starts the next on the
