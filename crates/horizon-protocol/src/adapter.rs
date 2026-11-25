@@ -562,10 +562,10 @@ mod tests {
             v.clientbound_id(State::Play, 39),
             Some(ids::play::clientbound::KEEP_ALIVE)
         );
-        // 26.3's serverbound keep_alive is 28; protocol 769 expects 30.
+        // 26.3's serverbound keep_alive is 28; protocol 769 expects 26.
         assert_eq!(
             v.serverbound_id(State::Play, ids::play::serverbound::KEEP_ALIVE),
-            Some(30)
+            Some(26)
         );
 
         // 1.21.4 has no packet for the 26.3-only post-effects update.
@@ -585,7 +585,7 @@ mod tests {
             ServerVersion::V1_21_4
                 .serverbound_body(State::Play, &body)
                 .unwrap(),
-            Some(vec![30, 1, 2, 3])
+            Some(vec![26, 1, 2, 3])
         );
     }
 
