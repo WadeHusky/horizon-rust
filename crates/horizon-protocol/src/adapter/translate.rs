@@ -2304,7 +2304,7 @@ mod tests {
         use std::sync::Arc;
 
         let mut item_names = vec!["minecraft:unused".to_owned(); 54];
-        item_names[53] = "minecraft:ender_pearl".to_owned();
+        item_names[53] = "minecraft:test_item".to_owned();
         let mut builtin = crate::registry::Builtin::default();
         builtin.registries.insert(
             "minecraft:item".to_owned(),
@@ -2330,7 +2330,7 @@ mod tests {
         assert_eq!(id, packet_ids::play::clientbound::COOLDOWN);
         let body = body.expect("cooldown payload translated");
         let mut r = Reader::new(&body);
-        assert_eq!(r.string(32767).unwrap(), "minecraft:ender_pearl");
+        assert_eq!(r.string(32767).unwrap(), "minecraft:test_item");
         assert_eq!(r.varint().unwrap(), 40);
         assert_eq!(r.remaining(), 0);
     }
