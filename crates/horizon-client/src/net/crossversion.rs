@@ -251,7 +251,7 @@ pub fn is_compatible(address: &str, protocol: i32) -> bool {
         .servers
         .iter()
         .any(|(known, version)| known == address && version != "auto")
-        || protocol != horizon_protocol::PROTOCOL_VERSION
+        || (protocol != 0 && protocol != horizon_protocol::PROTOCOL_VERSION)
 }
 
 /// The server's protocol version from its status, if it answered.
