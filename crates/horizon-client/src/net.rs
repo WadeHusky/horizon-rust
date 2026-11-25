@@ -13,7 +13,7 @@ use horizon_protocol::{
     buf::Reader,
     connection::{ConnReader, ConnWriter, Connection, Counters},
     crypto::{generate_secret, offline_uuid, server_hash},
-    packets::{Empty, configuration as cfg, handshake, login, play},
+    packets::{Empty, configuration as cfg, handshake, login, play, status},
     registry::{Builtin, Dynamic},
     rsa::RsaPublicKey,
     servers::parse_address,
@@ -1799,6 +1799,54 @@ mod tests {
                 Arc::new(Language::new()),
                 PathBuf::new(),
             );
+            // The client probes the server version before opening the login connection.
+            let (stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+            let mut status_server = Connection::from_stream(stream).unwrap();
+            let (id, body) = status_server.recv().unwrap();
+            let handshake::Serverbound::Intention(packet) =
+                handshake::Serverbound::decode(id, &body).unwrap()
+            else {
+                panic!("expected status handshake")
+            };
+            assert_eq!((packet.host.as_str(), packet.port), ("localhost", port));
+            assert_eq!(packet.intent, handshake::STATUS);
+            let (id, body) = status_server.recv().unwrap();
+            assert!(matches!(
+                status::Serverbound::decode(id, &body).unwrap(),
+                status::Serverbound::StatusRequest(_)
+            ));
+            status_server
+                .send(
+                    &status::Clientbound::StatusResponse(status::StatusResponse {
+                        json: serde_json::json!({
+                            "version": {
+                                "name": horizon_protocol::GAME_VERSION,
+                                "protocol": PROTOCOL_VERSION
+                            }
+                        })
+                        .to_string(),
+                    })
+                    .encode(),
+                )
+                .unwrap();
+            let (id, body) = status_server.recv().unwrap();
+            let status::Serverbound::PingRequest(ping) =
+                status::Serverbound::decode(id, &body).unwrap()
+            else {
+                panic!("expected status ping")
+            };
+            status_server
+                .send(
+                    &status::Clientbound::PongResponse(status::Ping { time: ping.time })
+                        .encode(),
+                )
+                .unwrap();
+            drop(status_server);
+
+            // Version detection is complete; the client now opens the actual login connection.
             let (stream, _) = listener.accept().unwrap();
             stream
                 .set_read_timeout(Some(Duration::from_secs(5)))
